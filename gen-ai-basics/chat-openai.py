@@ -19,9 +19,16 @@ result = client.chat.completions.create(
     model="gpt-3.5-turbo",
     max_tokens=100, # As API's are charged for tokens. We can provide max tokens to generate in outputs
     messages=[
-        {"role": "system", "content":system_prompt}, #Few shot prompting as some example is given
+        {"role": "system", "content":system_prompt}, #Few shot prompting which uses examples as given (Chain of thought)
         {"role": "user", "content":"Hey User"}  # zero shot prompting if no system prompt is given
     ]
 )
-print("Hello")
+
 print(result.choices[0].message.content)
+
+
+# Other types of prompting
+# self-consistent prompting: Gather answers from different sources and then provide best answer
+# persona based prompting: giving a persona to chatbot so that it talks like it
+# role play promting: giving a chatbot a role like a teacher etc and interacts accordingly
+# Combining all types of prompting, a good chatbot can be developed
