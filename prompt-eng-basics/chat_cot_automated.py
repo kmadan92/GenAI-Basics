@@ -54,7 +54,7 @@ while True:
     parsed_response = json.loads(response.choices[0].message.content)
     messages.append({ "role": "assistant", "content": json.dumps(parsed_response) })
 
-    if parsed_response.get("step") != "output":
+    if parsed_response.get("step") != "result":
         print(f"🧠: {parsed_response.get("content")}")
         continue
     

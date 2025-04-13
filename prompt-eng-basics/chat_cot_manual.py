@@ -40,12 +40,9 @@ result = client.chat.completions.create(
     messages=[
         { "role": "system", "content": system_prompt },
         { "role": "user", "content": "what is 3 + 4 * 5" },
-
-        # 
-        { "role": "assistant", "content": json.dumps({"step": "analyse", "content": "The user is asking for an arithmetic operation that involves both addition and multiplication, so I need to follow the order of operations."})  },
-        { "role": "assistant", "content": json.dumps({"step": "think", "content": "In order of operations, multiplication should be performed before addition. Therefore, I should first multiply 4 by 5."}) },
-        { "role": "assistant", "content": json.dumps({"step": "think", "content": "Calculate the multiplication: 4 * 5 = 20."}) },
-        { "role": "assistant", "content": json.dumps({"step": "think", "content": "Next, I need to add the result of the multiplication (20) to the number 3."}) }
+        {"role":"assistant","step":"analyze","content":"The user wants to perform an arithmetic operation involving both addition and multiplication."},
+        {"role":"assistant","step": "think", "content": "I need to consider the order of operations, also known as BODMAS/BIDMAS, which dictates that multiplication should be performed before addition."},
+        {"role":"assistant","step": "think", "content": "I need to consider the order of operations, also known as BODMAS/BIDMAS, which dictates that multiplication should be performed before addition."}
     ]
 )
 
