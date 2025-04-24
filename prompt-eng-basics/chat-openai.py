@@ -2,7 +2,8 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
+from pathlib import Path
+load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent/".env")
 
 client = OpenAI()
 
