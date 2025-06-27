@@ -1,3 +1,6 @@
+## Tracking Collections - http://localhost:6333/dashboard#/collections
+
+
 from pdf_processor import process_all_pdfs_in_folder
 from dotenv import load_dotenv
 import os
@@ -57,8 +60,12 @@ FrameMaker. This won’t change any of your existing work, and you can still use
 you know." }}
 
 Example:
-Input: Bye?
+Input: Bye
 Output: {{ "step": "end", "content": "GoodBye!!" }}
+
+Example:
+Input: Hi
+Output: {{ "step": "answer", "content": "How can I help you today?" }}
 
 """
 
