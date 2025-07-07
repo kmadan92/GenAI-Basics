@@ -2,29 +2,21 @@ import os
 from pathlib import Path
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings
-from langchain_qdrant import QdrantVectorStore
-from qdrant_client import QdrantClient
 from qdrant_client.http import models as qdrant_models
 from dotenv import load_dotenv
+from qdrant_client import QdrantClient
+from langchain_qdrant import QdrantVectorStore
 
 # Load env vars
 env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
-# Global constants
-QDRANT_HOST = "localhost"
-QDRANT_PORT = 6333
-QDRANT_URL = f"http://{QDRANT_HOST}:{QDRANT_PORT}"
-
-# Initialize once
-embedder = OpenAIEmbeddings(
-    model="text-embedding-3-small",
-    api_key=os.getenv("OPENAI_API_KEY")
-)
+QDRANT_HOST = os.getenv("QDRANT_HOST")
+QDRANT_PORT = os.getenv("QDRANT_PORT")
 client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
 
-def create_vector_store(file_path: str, collection_name: str):
+
+def create_vector_store(file_path: str, collection_name: str, recreate:bool, vector_size:int,embedder):
     """
     Creates a Qdrant collection and adds embedded chunks from a PDF.
     """
@@ -40,29 +32,40 @@ def create_vector_store(file_path: str, collection_name: str):
     print(f"\n📘 Processing: {os.path.basename(file_path)}")
     print(f" - Pages: {len(pages)} | Chunks: {len(chunks)}")
 
-    # Step 3: Recreate collection
-    client.recreate_collection(
+    # Step 3: Create or Recreate collection
+
+    existing_collections = client.get_collections().collections
+    collection_names = [col.name for col in existing_collections]
+
+    print(f"🎊 Existing Collections: {collection_names}")
+
+    if recreate and collection_name in collection_names:
+        client.recreate_collection(
         collection_name=collection_name,
         vectors_config=qdrant_models.VectorParams(
-            size=1536,  # Based on text-embedding-3-small
+            size=vector_size,  # Based on text-embedding-3-small
             distance=qdrant_models.Distance.COSINE,
         )
-    )
+         )  
+    elif(collection_name not in collection_names):
+        client.create_collection(
+        collection_name=collection_name,
+        vectors_config=qdrant_models.VectorParams(
+            size=vector_size,
+            distance=qdrant_models.Distance.COSINE
+        )
+        )
+    else:
+        print(f"📂 Adding to existing collection: {collection_name}")
 
     # Step 4: Create vectorstore and insert documents
     vectorstore = QdrantVectorStore(
-        embedding=embedder,
-        collection_name=collection_name,
-        client=client
-    )
+    embedding=embedder,
+    collection_name=collection_name,
+    client=client
+        )
+
     vectorstore.add_documents(chunks)
 
-    print(f"✅ Collection '{collection_name}' ready and populated.")
+    print(f"✅ PDF at'{file_path}' processed.")
 
-    # Step 5: Return retriever for this collection
-    retriever = QdrantVectorStore.from_existing_collection(
-        collection_name=collection_name,
-        embedding=embedder,
-        url=QDRANT_URL
-    )
-    return retriever

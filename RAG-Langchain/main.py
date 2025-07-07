@@ -7,16 +7,22 @@ import os
 from openai import OpenAI
 import json
 from pathlib import Path
+from langchain_openai import OpenAIEmbeddings
 
 # Load environment just in case
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
+env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
+
+# Initialize once
+embedder = OpenAIEmbeddings(
+    model="text-embedding-3-small",
+    api_key=os.getenv("OPENAI_API_KEY")
+)
 
 # Folder with your PDFs
 pdf_folder_path = Path(__file__).resolve().parent/"pdf"
 
-print("Fetching PDF's to learn from: ",pdf_folder_path)
-
-retrievers = process_all_pdfs_in_folder(pdf_folder_path)
+retrievers = process_all_pdfs_in_folder(pdf_folder_path,False,1536,embedder)
 
 print(f"\nTotal retrievers created: {len(retrievers)}")
 
