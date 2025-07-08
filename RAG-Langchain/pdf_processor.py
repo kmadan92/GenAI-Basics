@@ -13,7 +13,7 @@ QDRANT_PORT = os.getenv("QDRANT_PORT")
 QDRANT_URL = f"http://{QDRANT_HOST}:{QDRANT_PORT}"
 
 
-def process_all_pdfs_in_folder(pdf_root_folder: Path, recreate:bool, vector_size:int, embedder):
+def process_all_pdfs_in_folder(pdf_root_folder: Path, skipIndexing:bool,recreate:bool, vector_size:int, embedder):
     """
     Creates vector stores for all PDFs in a folder. Returns retrievers list.
     """
@@ -38,16 +38,17 @@ def process_all_pdfs_in_folder(pdf_root_folder: Path, recreate:bool, vector_size
             print(f"⚠️ No PDFs found in subfolder: {collection_name}")
             continue
 
-        print(f"\n📂 Creating collection: {collection_name} ({len(pdf_files)} PDFs)")
 
-        for pdf_file in pdf_files:
-            create_vector_store(
+        if not skipIndexing:
+            print(f"\n📂 Creating collection: {collection_name} ({len(pdf_files)} PDFs)")
+            for pdf_file in pdf_files:
+                create_vector_store(
                 file_path=str(pdf_file),
                 collection_name=collection_name,
                 recreate=recreate,
                 vector_size=vector_size,
                 embedder=embedder
-            )
+                )
 
         retriever = QdrantVectorStore.from_existing_collection(
             collection_name=collection_name,

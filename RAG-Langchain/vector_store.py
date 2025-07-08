@@ -37,13 +37,12 @@ def create_vector_store(file_path: str, collection_name: str, recreate:bool, vec
     existing_collections = client.get_collections().collections
     collection_names = [col.name for col in existing_collections]
 
-    print(f"🎊 Existing Collections: {collection_names}")
 
     if recreate and collection_name in collection_names:
         client.recreate_collection(
         collection_name=collection_name,
         vectors_config=qdrant_models.VectorParams(
-            size=vector_size,  # Based on text-embedding-3-small
+            size=vector_size,  
             distance=qdrant_models.Distance.COSINE,
         )
          )  

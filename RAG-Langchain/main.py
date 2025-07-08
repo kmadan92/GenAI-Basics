@@ -3,33 +3,48 @@
 
 from pdf_processor import process_all_pdfs_in_folder
 from dotenv import load_dotenv
-import os
+import os,re
 from openai import OpenAI
 import json
 from pathlib import Path
 from langchain_openai import OpenAIEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 # Load environment just in case
 env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    raise ValueError("Missing GOOGLE_API_KEY in .env file")
+
 
 # Initialize once
-embedder = OpenAIEmbeddings(
-    model="text-embedding-3-small",
-    api_key=os.getenv("OPENAI_API_KEY")
+embedder = GoogleGenerativeAIEmbeddings(
+    model="models/embedding-001",
+    google_api_key=GOOGLE_API_KEY
 )
+# embedder = OpenAIEmbeddings(
+#     model="text-embedding-3-small",
+#     api_key=os.getenv("OPENAI_API_KEY")
+# )
 
 # Folder with your PDFs
 pdf_folder_path = Path(__file__).resolve().parent/"pdf"
 
-retrievers = process_all_pdfs_in_folder(pdf_folder_path,False,1536,embedder)
+retrievers = process_all_pdfs_in_folder(pdf_folder_path,True,False,768,embedder)
 
 print(f"\nTotal retrievers created: {len(retrievers)}")
 
 print(f"\n************Starting Chat************")
 print(f"\n************Type Bye To End Chat************")
 
-client = OpenAI()
+#client = OpenAI()
+client = ChatGoogleGenerativeAI(
+    model="gemini-2.0-flash-lite",
+    temperature=0,
+    google_api_key=GOOGLE_API_KEY
+)
 
 
 def get_chunks(question: str):
@@ -80,7 +95,7 @@ Output: {{ "step": "answer", "content": "How can I help you today?" }}
 messages = []
 
 while True:
-    user_input = input("> ")
+    user_input = input(">> ")
 
     if user_input.lower().strip() in ["bye", "exit", "quit"]:
         print('🧠: GoodBye!!')
@@ -94,19 +109,35 @@ while True:
 
     system_prompt = base_system_prompt.format(relevant_chunks=context)
     
-    messages = [{"role": "system", "content": system_prompt}]
-    messages.append({"role": "user", "content": user_input})
+    #For Gemini
+    messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=user_input)
+    ]
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        response_format={"type": "json_object"},
-        messages=messages
-    )
-
-    parsed_response = json.loads(response.choices[0].message.content)
-    messages.append({"role": "assistant", "content": json.dumps(parsed_response)})
-
+    try:
+        response = client.invoke(messages)
+        json_str = re.sub(r"^```(?:json)?\n|\n```$", "", response.content.strip())
+        parsed_response = json.loads(json_str)
+        
+    except Exception as e:
+        print("⚠️ Error parsing response. Raw response:")
+        print (e)
+        continue
+    # For Open AI
+    # messages = [{"role": "system", "content": system_prompt}]
+    # messages.append({"role": "user", "content": user_input})
+    # response = client.chat.completions.create(
+    #     model="gpt-4o-mini",
+    #     response_format={"type": "json_object"},
+    #     messages=messages
+    # )
+    # parsed_response = json.loads(response.choices[0].message.content)
+    # messages.append({"role": "assistant", "content": json.dumps(parsed_response)})
+    
     print(f'🧠: {parsed_response.get("content")}')
+   
+   
 
     if parsed_response.get("step") == "end":
         print("Chat ended. 👋")
