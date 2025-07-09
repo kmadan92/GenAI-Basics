@@ -10,6 +10,8 @@ from pathlib import Path
 from langchain_openai import OpenAIEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from fanout_rrf_query import fanout_rrf_query_multiqueries
+from subquery_fanout_llm import generate_query_variants
 
 # Load environment just in case
 env_path = Path(__file__).resolve().parent.parent / ".env"
@@ -24,15 +26,17 @@ embedder = GoogleGenerativeAIEmbeddings(
     model="models/embedding-001",
     google_api_key=GOOGLE_API_KEY
 )
+DIMENSIONS = 768
 # embedder = OpenAIEmbeddings(
 #     model="text-embedding-3-small",
 #     api_key=os.getenv("OPENAI_API_KEY")
 # )
+#DIMENSIONS = 1536
 
 # Folder with your PDFs
 pdf_folder_path = Path(__file__).resolve().parent/"pdf"
 
-retrievers = process_all_pdfs_in_folder(pdf_folder_path,True,False,768,embedder)
+retrievers = process_all_pdfs_in_folder(pdf_folder_path,True,False,DIMENSIONS,embedder)
 
 print(f"\nTotal retrievers created: {len(retrievers)}")
 
@@ -48,11 +52,17 @@ client = ChatGoogleGenerativeAI(
 
 
 def get_chunks(question: str):
-    relevant_chunks=[]
-    for ret in retrievers:
-        results = ret.similarity_search(query=question, k=3)
-        for res in results:
-            relevant_chunks.append(res.page_content.strip())
+    queries = generate_query_variants(question)
+    print("\nGenerated Query Variants:")
+    for idx, q in enumerate(queries, 1):
+        print(f"  Q{idx}: {q}")
+    relevant_chunks= fanout_rrf_query_multiqueries(queries,retrievers)
+
+    # Code for basic rag without any optimization like Fanout, Hyde
+    # for ret in retrievers:
+    #     results = ret.similarity_search(query=question, k=3)
+    #     for res in results:
+    #         relevant_chunks.append(res.page_content.strip())
     return relevant_chunks
 
 
@@ -136,8 +146,6 @@ while True:
     # messages.append({"role": "assistant", "content": json.dumps(parsed_response)})
     
     print(f'🧠: {parsed_response.get("content")}')
-   
-   
 
     if parsed_response.get("step") == "end":
         print("Chat ended. 👋")
