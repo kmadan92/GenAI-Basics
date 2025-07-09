@@ -1,9 +1,16 @@
-
 from langchain_google_genai import ChatGoogleGenerativeAI
 import os, json
+from pathlib import Path
+from dotenv import load_dotenv
 
-# Set this externally or load via dotenv
+# Load environment just in case
+env_path = Path(__file__).resolve().parent.parent.parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
+print(env_path)
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    raise ValueError("Missing GOOGLE_API_KEY in .env file")
+
 
 client = ChatGoogleGenerativeAI(
     model="gemini-2.0-flash-lite",

@@ -1,7 +1,7 @@
 ## Tracking Collections - http://localhost:6333/dashboard#/collections
 
 
-from pdf_processor import process_all_pdfs_in_folder
+from indexing.pdf_processor import process_all_pdfs_in_folder
 from dotenv import load_dotenv
 import os,re
 from openai import OpenAI
@@ -10,11 +10,11 @@ from pathlib import Path
 from langchain_openai import OpenAIEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from fanout_rrf_query import fanout_rrf_query_multiqueries
-from subquery_fanout_llm import generate_query_variants
+from retreival.fanout_rrf_query import fanout_rrf_query_multiqueries
+from retreival.subquery_fanout_llm import generate_query_variants
 
 # Load environment just in case
-env_path = Path(__file__).resolve().parent.parent / ".env"
+env_path = Path(__file__).resolve().parent.parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
@@ -34,9 +34,9 @@ DIMENSIONS = 768
 #DIMENSIONS = 1536
 
 # Folder with your PDFs
-pdf_folder_path = Path(__file__).resolve().parent/"pdf"
+pdf_folder_path = Path(__file__).resolve().parent.parent /"pdf"
 
-retrievers = process_all_pdfs_in_folder(pdf_folder_path,True,False,DIMENSIONS,embedder)
+retrievers = process_all_pdfs_in_folder(pdf_folder_path,False,False,DIMENSIONS,embedder)
 
 print(f"\nTotal retrievers created: {len(retrievers)}")
 
@@ -56,8 +56,9 @@ def get_chunks(question: str):
     print("\nGenerated Query Variants:")
     for idx, q in enumerate(queries, 1):
         print(f"  Q{idx}: {q}")
-    relevant_chunks= fanout_rrf_query_multiqueries(queries,retrievers)
-
+    relevant_chunks= fanout_rrf_query_multiqueries(queries,retrievers,10,5)
+    print("\nChunks:")
+    print(relevant_chunks)
     # Code for basic rag without any optimization like Fanout, Hyde
     # for ret in retrievers:
     #     results = ret.similarity_search(query=question, k=3)
@@ -68,8 +69,12 @@ def get_chunks(question: str):
 
 base_system_prompt = """
 
-You are an AI assistant who is expert in answering questions for users. You only answer questions 
-available in your context and does not answer if nothing is found in your context.
+You are an AI assistant who is expert in answering questions for users. 
+Use as much context in available with you
+and help to create a meaningful, accurate and complete answer.
+Use examples if available in context to explain questions. If examples are not available in context skip examples
+You only answer questions 
+available in your context and does not answer if nothing is found in your context. 
 
 Context:
 {relevant_chunks}
@@ -77,6 +82,7 @@ Context:
 Rules:
 - Use Available context only to solve user queries
 - If Context is empty return - "I do not know this" as answer
+- Combine and synthesize information across multiple context parts if needed.
 - Provide response in JSON format
 
 Output Format (strict JSON):
