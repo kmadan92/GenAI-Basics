@@ -8,7 +8,8 @@ from openai import OpenAI
 import json
 from pathlib import Path
 from langchain_openai import OpenAIEmbeddings
-from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
+from langchain_google_genai import  GoogleGenerativeAIEmbeddings
+from langchain_ollama import ChatOllama
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from retreival.fanout_rrf_query import fanout_rrf_query_multiqueries
 from retreival.subquery_fanout_llm import generate_query_variants
@@ -16,9 +17,14 @@ from retreival.subquery_fanout_llm import generate_query_variants
 # Load environment just in case
 env_path = Path(__file__).resolve().parent.parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
+
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
     raise ValueError("Missing GOOGLE_API_KEY in .env file")
+
+OLLAMA_HOST = os.getenv("OLLAMA_URL")
+if not OLLAMA_HOST:
+    raise ValueError("Missing OLLAMA_HOST in .env file")
 
 
 # Initialize once
@@ -36,7 +42,7 @@ DIMENSIONS = 768
 # Folder with your PDFs
 pdf_folder_path = Path(__file__).resolve().parent.parent /"pdf"
 
-retrievers = process_all_pdfs_in_folder(pdf_folder_path,False,False,DIMENSIONS,embedder)
+retrievers = process_all_pdfs_in_folder(pdf_folder_path,True,False,DIMENSIONS,embedder)
 
 print(f"\nTotal retrievers created: {len(retrievers)}")
 
@@ -44,21 +50,31 @@ print(f"\n************Starting Chat************")
 print(f"\n************Type Bye To End Chat************")
 
 #client = OpenAI()
-client = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash-lite",
-    temperature=0,
-    google_api_key=GOOGLE_API_KEY
+client = ChatOllama(
+    base_url=OLLAMA_HOST,  # Ollama via Docker
+    model="llama3",                     # Or another pulled model (like mistral, codellama, etc.)
+    temperature=0
 )
+
+import json
+
+def is_json(myjson: str) -> bool:
+    try:
+        json.loads(myjson)
+        return True
+    except ValueError:
+        return False
 
 
 def get_chunks(question: str):
     queries = generate_query_variants(question)
-    print("\nGenerated Query Variants:")
-    for idx, q in enumerate(queries, 1):
-        print(f"  Q{idx}: {q}")
-    relevant_chunks= fanout_rrf_query_multiqueries(queries,retrievers,10,5)
-    print("\nChunks:")
-    print(relevant_chunks)
+    # print("\nGenerated Query Variants:")
+    # for idx, q in enumerate(queries, 1):
+    #     print(f"  Q{idx}: {q}")
+    relevant_chunks= fanout_rrf_query_multiqueries(queries,retrievers,20,10)
+    print(f"Relevant Chunks returned: {len(relevant_chunks)}")
+    # print("\nChunks:")
+    # print(relevant_chunks)
     # Code for basic rag without any optimization like Fanout, Hyde
     # for ret in retrievers:
     #     results = ret.similarity_search(query=question, k=3)
@@ -66,35 +82,38 @@ def get_chunks(question: str):
     #         relevant_chunks.append(res.page_content.strip())
     return relevant_chunks
 
-
 base_system_prompt = """
 
 You are an AI assistant who is expert in answering questions for users. 
-Use as much context in available with you
-and help to create a meaningful, accurate and complete answer.
-Use examples if available in context to explain questions. If examples are not available in context skip examples
+Use as much context available with you.
+and prefer long, detailed answers if relevant context supports it. Summarize across multiple chunks if needed.
+Use examples if available in context to explain questions. If examples are not available in context skip examples.
 You only answer questions 
-available in your context and does not answer if nothing is found in your context. 
+available in your context and do not answer if nothing is found in your context. 
 
 Context:
 {relevant_chunks}
 
 Rules:
-- Use Available context only to solve user queries
-- If Context is empty return - "I do not know this" as answer
+- Use available context only to solve user queries.
+- If context is empty return - "I do not know this" as answer.
 - Combine and synthesize information across multiple context parts if needed.
-- Provide response in JSON format
+- Provide response in strict JSON format.
+
+IMPORTANT: You must only output a single JSON object. No additional text, no explanation, no markdown.
+If you do not know the answer, respond with {{"step": "answer", "content": "I do not know"}} exactly.
+
+IMPORTANT: You must return a valid JSON object with the format:
+{{ "step": "answer", "content": "..." }}
+Do NOT return plain text or natural language. If unsure, say:
+{{ "step": "answer", "content": "I do not know" }}
 
 Output Format (strict JSON):
 {{ "step": "string", "content": "string" }}
 
 Example:
 Input: Tell me about Framemaker?
-Output: {{ step: "answer", "function":"get_chunks", "input":"Tell me about Framemaker?",content: "For a FrameMaker user, Structured FrameMaker is the easiest way to experiment with structured documents. 
-It comes with ready-made templates that illustrate the extra value structure gives you. If you currently use 
-unstructured FrameMaker, just open the Preferences dialog box and set the Product Interface to Structured 
-FrameMaker. This won’t change any of your existing work, and you can still use all the unstructured features 
-you know." }}
+Output: {{ "step": "answer", "function":"get_chunks", "input":"Tell me about Framemaker?", "content": "For a FrameMaker user, Structured FrameMaker is the easiest way to experiment with structured documents. It comes with ready-made templates that illustrate the extra value structure gives you. If you currently use unstructured FrameMaker, just open the Preferences dialog box and set the Product Interface to Structured FrameMaker. This won’t change any of your existing work, and you can still use all the unstructured features you know." }}
 
 Example:
 Input: Bye
@@ -103,6 +122,9 @@ Output: {{ "step": "end", "content": "GoodBye!!" }}
 Example:
 Input: Hi
 Output: {{ "step": "answer", "content": "How can I help you today?" }}
+
+Input: Who was Hitler?
+Output: {{ "step": "answer", "function":"get_chunks", "input":"Who was Hitler?", "content": "I don’t know" }}
 
 """
 
@@ -134,11 +156,19 @@ while True:
     try:
         response = client.invoke(messages)
         json_str = re.sub(r"^```(?:json)?\n|\n```$", "", response.content.strip())
-        parsed_response = json.loads(json_str)
+        if is_json(json_str):
+            parsed_response = json.loads(json_str)
+        else:
+            # fallback: wrap plain text into your json format
+            parsed_response = {
+            "step": "answer",
+            "content": response.content.strip()
+            }
         
     except Exception as e:
         print("⚠️ Error parsing response. Raw response:")
         print (e)
+        print(response)
         continue
     # For Open AI
     # messages = [{"role": "system", "content": system_prompt}]

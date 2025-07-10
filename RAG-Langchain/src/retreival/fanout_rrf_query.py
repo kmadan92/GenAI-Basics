@@ -30,8 +30,8 @@ def reciprocal_rank_fusion(results: List[List[Tuple[str, float]]], k: int = 3) -
 def fanout_rrf_query_multiqueries(
     queries: List[str],
     retrievers: List[VectorStoreRetriever],
-    top_k_per_ret: int = 5,
-    final_k: int = 3
+    top_k_per_ret: int,
+    final_k: int
 ) -> List[str]:
     """
     Perform fan-out retrieval for multiple query variants across multiple retrievers,
