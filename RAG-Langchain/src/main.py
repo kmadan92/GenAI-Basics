@@ -1,4 +1,6 @@
 ## Tracking Collections - http://localhost:6333/dashboard#/collections
+## Ollama: http://localhost:11434
+## Qdrant UI (if you enabled): http://localhost:6333
 
 
 from indexing.pdf_processor import process_all_pdfs_in_folder
