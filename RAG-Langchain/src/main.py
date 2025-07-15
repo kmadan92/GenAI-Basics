@@ -13,6 +13,8 @@ from langchain_ollama import ChatOllama
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from retreival.fanout_rrf_query import fanout_rrf_query_multiqueries
 from retreival.subquery_fanout_llm import generate_query_variants
+from mem0 import MemoryClient
+
 
 # Load environment just in case
 env_path = Path(__file__).resolve().parent.parent.parent / ".env"
@@ -25,6 +27,10 @@ if not GOOGLE_API_KEY:
 OLLAMA_HOST = os.getenv("OLLAMA_URL")
 if not OLLAMA_HOST:
     raise ValueError("Missing OLLAMA_HOST in .env file")
+
+MEM0_KEY = os.getenv("MEM0_API_KEY")
+if not OLLAMA_HOST:
+    raise ValueError("Missing MEM0_KEY in .env file")
 
 
 # Initialize once
@@ -56,7 +62,7 @@ client = ChatOllama(
     temperature=0
 )
 
-import json
+mem0_client = MemoryClient(api_key=MEM0_KEY)
 
 def is_json(myjson: str) -> bool:
     try:
@@ -139,19 +145,25 @@ while True:
         print('🧠: GoodBye!!')
         break
 
+    mem0_context = mem0_client.search(user_input, user_id="kapil")
+    mem0_context_texts = [mem.get("content", "") for mem in mem0_context if isinstance(mem, dict)]
     relevant_chunks = get_chunks(user_input)
-    context = "\n\n".join(relevant_chunks)
+    all_texts = mem0_context_texts + relevant_chunks
+    context = "\n\n".join(set(all_texts))
+
 
     if not context.strip():
         context = "I do not know this."
 
     system_prompt = base_system_prompt.format(relevant_chunks=context)
     
-    #For Gemini
+    #For Gemini/Llama3
     messages = [
         SystemMessage(content=system_prompt),
         HumanMessage(content=user_input)
     ]
+
+    print(f"messages:{messages}")
 
     try:
         response = client.invoke(messages)
@@ -181,6 +193,20 @@ while True:
     # parsed_response = json.loads(response.choices[0].message.content)
     # messages.append({"role": "assistant", "content": json.dumps(parsed_response)})
     
+    mem0_client.add(
+    [
+        {
+            "role": "system" if isinstance(msg, SystemMessage)
+                     else "user" if isinstance(msg, HumanMessage)
+                     else "assistant",
+            "content": msg.content.strip()
+        }
+        for msg in messages if hasattr(msg, "content") and msg.content.strip()
+    ],
+    user_id="kapil",
+    output_format="v1.1"
+    )
+
     print(f'🧠: {parsed_response.get("content")}')
 
     if parsed_response.get("step") == "end":
