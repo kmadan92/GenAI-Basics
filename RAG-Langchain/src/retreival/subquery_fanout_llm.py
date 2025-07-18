@@ -2,6 +2,8 @@ from langchain_ollama import ChatOllama
 import os, json
 from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
+from langfuse import observe
+
 
 # Load environment just in case
 env_path = Path(__file__).resolve().parent.parent.parent.parent / ".env"
@@ -22,6 +24,7 @@ client = ChatOllama(
     temperature=0
 )
 
+@observe(name="generate_query_variants")
 def generate_query_variants(query: str) -> list:
    
     prompt = f"""

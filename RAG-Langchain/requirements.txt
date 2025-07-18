@@ -33,6 +33,7 @@ httpx==0.28.1
 httpx-sse==0.4.0
 hyperframe==6.1.0
 idna==3.10
+importlib_metadata==8.7.0
 jiter==0.9.0
 jsonpatch==1.33
 jsonpointer==3.0.0
@@ -44,6 +45,7 @@ langchain-ollama==0.3.4
 langchain-openai==0.3.14
 langchain-qdrant==0.2.0
 langchain-text-splitters==0.3.8
+langfuse==3.2.1
 langsmith==0.4.4
 marshmallow==3.26.1
 mem0ai==0.1.114
@@ -52,6 +54,14 @@ mypy_extensions==1.1.0
 numpy==2.2.5
 ollama==0.5.1
 openai==1.76.0
+opentelemetry-api==1.35.0
+opentelemetry-exporter-otlp==1.35.0
+opentelemetry-exporter-otlp-proto-common==1.35.0
+opentelemetry-exporter-otlp-proto-grpc==1.35.0
+opentelemetry-exporter-otlp-proto-http==1.35.0
+opentelemetry-proto==1.35.0
+opentelemetry-sdk==1.35.0
+opentelemetry-semantic-conventions==0.56b0
 orjson==3.10.16
 packaging==24.2
 portalocker==2.10.1
@@ -87,5 +97,7 @@ typing-inspection==0.4.0
 typing_extensions==4.13.2
 uritemplate==4.2.0
 urllib3==2.4.0
+wrapt==1.17.2
 yarl==1.20.0
+zipp==3.23.0
 zstandard==0.23.0

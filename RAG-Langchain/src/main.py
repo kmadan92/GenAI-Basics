@@ -3,6 +3,7 @@
 ## Qdrant UI (if you enabled): http://localhost:6333
 
 
+import langfuse.types
 from indexing.pdf_processor import process_all_pdfs_in_folder
 from dotenv import load_dotenv
 import os,re
@@ -16,24 +17,36 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from retreival.fanout_rrf_query import fanout_rrf_query_multiqueries
 from retreival.subquery_fanout_llm import generate_query_variants
 from mem0 import MemoryClient
-
+from langfuse import Langfuse, observe
 
 # Load environment just in case
 env_path = Path(__file__).resolve().parent.parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-if not GOOGLE_API_KEY:
-    raise ValueError("Missing GOOGLE_API_KEY in .env file")
-
 OLLAMA_HOST = os.getenv("OLLAMA_URL")
-if not OLLAMA_HOST:
-    raise ValueError("Missing OLLAMA_HOST in .env file")
-
 MEM0_KEY = os.getenv("MEM0_API_KEY")
-if not OLLAMA_HOST:
-    raise ValueError("Missing MEM0_KEY in .env file")
+LANGFUSE_SECRET = os.getenv("LANGFUSE_SECRET_KEY")
+LANGFUSE_PUBLIC = os.getenv("NEXT_PUBLIC_LANGFUSE_PUBLIC_KEY")
 
+# Validate all keys
+for key, value in {
+    "GOOGLE_API_KEY": GOOGLE_API_KEY,
+    "OLLAMA_HOST": OLLAMA_HOST,
+    "MEM0_API_KEY": MEM0_KEY,
+    "LANGFUSE_SECRET_KEY": LANGFUSE_SECRET,
+    "NEXT_PUBLIC_LANGFUSE_PUBLIC_KEY": LANGFUSE_PUBLIC
+}.items():
+    if not value:
+        raise ValueError(f"Missing {key} in .env file")
+    
+# Langfuse setup
+
+langfuse = Langfuse(
+    secret_key=LANGFUSE_SECRET,
+    public_key=LANGFUSE_PUBLIC,
+    host="http://localhost:3000"
+)
 
 # Initialize once
 embedder = GoogleGenerativeAIEmbeddings(
@@ -66,6 +79,7 @@ client = ChatOllama(
 
 mem0_client = MemoryClient(api_key=MEM0_KEY)
 
+
 def is_json(myjson: str) -> bool:
     try:
         json.loads(myjson)
@@ -73,7 +87,7 @@ def is_json(myjson: str) -> bool:
     except ValueError:
         return False
 
-
+@observe(name="get_chunks_from_vectorDB")
 def get_chunks(question: str):
     queries = generate_query_variants(question)
     # print("\nGenerated Query Variants:")
@@ -89,6 +103,14 @@ def get_chunks(question: str):
     #     for res in results:
     #         relevant_chunks.append(res.page_content.strip())
     return relevant_chunks
+
+@observe(name="mem0_search")
+def mem0_search(user_input: str):
+    return mem0_client.search(user_input, user_id="kapil")
+
+@observe(name="llama3_ollama_invoke")
+def invoke_llm(messages):
+    return client.invoke(messages)
 
 base_system_prompt = """
 
@@ -147,7 +169,7 @@ while True:
         print('🧠: GoodBye!!')
         break
 
-    mem0_context = mem0_client.search(user_input, user_id="kapil")
+    mem0_context = mem0_search(user_input)
     mem0_context_texts = [mem.get("content", "") for mem in mem0_context if isinstance(mem, dict)]
     relevant_chunks = get_chunks(user_input)
     all_texts = mem0_context_texts + relevant_chunks
@@ -168,7 +190,7 @@ while True:
     print(f"messages:{messages}")
 
     try:
-        response = client.invoke(messages)
+        response = invoke_llm(messages)
         json_str = re.sub(r"^```(?:json)?\n|\n```$", "", response.content.strip())
         if is_json(json_str):
             parsed_response = json.loads(json_str)
