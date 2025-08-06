@@ -1,0 +1,12 @@
+services:
+  ollama:
+    image: ollama/ollama
+    container_name: ollama-mistral
+    ports:
+      - "11435:11434"         # Ollama API exposed here
+    volumes:
+      - ollama-data:/root/.ollama  # Persist model cache/data
+    restart: unless-stopped
+
+volumes:
+  ollama-data:
