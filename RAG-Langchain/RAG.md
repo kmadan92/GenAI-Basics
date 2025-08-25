@@ -7,9 +7,12 @@ An intelligent assistant powered by **LangChain**, **OpenAI embeddings**, and **
 ## 🚀 Features
 
 - Reads and understands PDF files using OpenAI Embeddings
-- Uses Qdrant as a vector store for fast and scalable semantic search
+- Uses QdrantDB as a vector store for fast and scalable semantic search
 - Built with LangChain for streamlined retrieval and generation
 - Lightweight and easy to use — just drop in PDFs and run!
+
+  <img width="1865" height="1046" alt="image" src="https://github.com/user-attachments/assets/0c3c4223-4113-4ce2-af08-8c2d039dc90e" />
+
 
 ---
 
