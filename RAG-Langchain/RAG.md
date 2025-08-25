@@ -1,4 +1,4 @@
-# 🤖 AI Assistant Chatbot (PDF Q&A Application)
+# 🤖 AI Assistant Chatbot (Chat over PDF)
 
 An intelligent assistant powered by **LangChain**, **OpenAI embeddings**, and **Qdrant**. This chatbot learns from your PDFs and answers any relevant questions based on the content.
 
